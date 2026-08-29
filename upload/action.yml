@@ -13,6 +13,12 @@ inputs:
     description: Behaviour when the path matches nothing. One of warn, error, ignore.
     required: false
     default: warn
+  key-prefix:
+    description: >-
+      Replace the repository segment of the object key, giving this artifact its
+      own bucket-lifecycle prefix. Same character rules as name. Defaults to the
+      repository name. A consumer must pass the matching run-prefix to download.
+    required: false
   link-expiry-seconds:
     description: Presigned link lifetime. Capped at 604800 (7 days) by SigV4.
     required: false

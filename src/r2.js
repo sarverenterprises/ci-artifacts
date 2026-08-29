@@ -35,8 +35,12 @@ function r2Config(env = process.env) {
  *
  * The attempt number is part of the key so that re-running a workflow does not
  * overwrite the evidence produced by the original attempt.
+ *
+ * `root` replaces the repository segment. Bucket lifecycle rules match on a key
+ * prefix, so an artifact that needs its own retention -- a released build kept
+ * for a year next to throwaway PR bundles -- must not share the default root.
  */
-function runPrefix(env = process.env) {
+function runPrefix(env = process.env, root = "") {
   const repo = (env.GITHUB_REPOSITORY || "").split("/")[1];
   const runId = env.GITHUB_RUN_ID;
   const attempt = env.GITHUB_RUN_ATTEMPT || "1";
@@ -45,7 +49,7 @@ function runPrefix(env = process.env) {
     throw new Error("GITHUB_REPOSITORY and GITHUB_RUN_ID must be set; this action only runs inside GitHub Actions.");
   }
 
-  return `${repo}/${runId}/${attempt}`;
+  return `${root || repo}/${runId}/${attempt}`;
 }
 
 /**

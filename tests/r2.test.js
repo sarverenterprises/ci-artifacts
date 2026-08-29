@@ -46,3 +46,15 @@ test("artifact names cannot escape the run prefix", () => {
     assert.equal(assertSafeName(name), name);
   }
 });
+
+test("runPrefix root override gives an artifact its own lifecycle prefix", () => {
+  const base = { GITHUB_REPOSITORY: "sarverenterprises/feedvalue", GITHUB_RUN_ID: "42", GITHUB_RUN_ATTEMPT: "1" };
+
+  // A bucket lifecycle rule matches on a key prefix, so a release kept for a
+  // year must not sit under the same root as throwaway PR bundles.
+  assert.equal(runPrefix(base, "feedvalue-release"), "feedvalue-release/42/1");
+  // An empty override is not an override; the repository name still applies.
+  assert.equal(runPrefix(base, ""), "feedvalue/42/1");
+  // The run and attempt segments survive, so a re-run still cannot overwrite.
+  assert.equal(runPrefix({ ...base, GITHUB_RUN_ATTEMPT: "2" }, "feedvalue-release"), "feedvalue-release/42/2");
+});

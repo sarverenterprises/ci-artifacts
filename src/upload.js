@@ -90,6 +90,9 @@ async function run() {
   const pattern = core.getInput("path", { required: true });
   const ifNoFilesFound = core.getInput("if-no-files-found") || "warn";
   const expiry = Math.min(Number(core.getInput("link-expiry-seconds") || 604800), MAX_PRESIGN_SECONDS);
+  // Validated like an artifact name because it reaches an object key too.
+  const keyPrefixInput = core.getInput("key-prefix");
+  const keyPrefix = keyPrefixInput ? assertSafeName(keyPrefixInput.trim()) : "";
 
   const files = await resolveFiles(pattern);
 
@@ -108,7 +111,7 @@ async function run() {
   const { bucket, client } = r2Config();
   const { root, declaredDirectory } = resolveRoot(pattern, files);
   const { body, key, archived } = buildPayload(files, root, name, declaredDirectory);
-  const objectKey = `${runPrefix()}/${key}`;
+  const objectKey = `${runPrefix(process.env, keyPrefix)}/${key}`;
   const size = fs.statSync(body).size;
 
   await client.send(
