@@ -44,11 +44,35 @@ function commonRoot(files) {
 }
 
 /**
+ * Root the archive at a directory the caller named outright.
+ *
+ * actions/upload-artifact uses the given path as the archive root. commonRoot
+ * would instead pick the deepest shared ancestor, so a `blog/dist` whose files
+ * all sit under `_astro/` would silently lose that directory on extraction.
+ */
+function resolveRoot(pattern, files) {
+  const lines = pattern.split("\n").map((line) => line.trim()).filter(Boolean);
+
+  if (lines.length === 1 && !/[*?[\]!]/.test(lines[0])) {
+    const resolved = path.resolve(lines[0]);
+
+    if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) {
+      return { root: resolved, declaredDirectory: true };
+    }
+  }
+
+  return { root: commonRoot(files), declaredDirectory: false };
+}
+
+/**
  * A single file is uploaded as-is so its link downloads the real artifact --
  * an APK stays an APK. Multiple files are tarred so one artifact is one object.
+ *
+ * A named directory is always archived, even when it holds exactly one file,
+ * because storing that file raw would drop the path it sits at.
  */
-function buildPayload(files, root, name) {
-  if (files.length === 1 && fs.statSync(files[0]).isFile()) {
+function buildPayload(files, root, name, declaredDirectory) {
+  if (!declaredDirectory && files.length === 1 && fs.statSync(files[0]).isFile()) {
     return { body: files[0], key: `${name}/${path.basename(files[0])}`, archived: false };
   }
 
@@ -82,7 +106,8 @@ async function run() {
   }
 
   const { bucket, client } = r2Config();
-  const { body, key, archived } = buildPayload(files, commonRoot(files), name);
+  const { root, declaredDirectory } = resolveRoot(pattern, files);
+  const { body, key, archived } = buildPayload(files, root, name, declaredDirectory);
   const objectKey = `${runPrefix()}/${key}`;
   const size = fs.statSync(body).size;
 
