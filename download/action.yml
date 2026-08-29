@@ -1,0 +1,20 @@
+name: Download artifact from R2
+description: Download an artifact previously uploaded by ci-artifacts/upload.
+inputs:
+  name:
+    description: Artifact name to fetch.
+    required: true
+  path:
+    description: Destination directory. Defaults to the artifact name.
+    required: false
+  run-prefix:
+    description: >-
+      Override the source prefix, as <repo>/<run_id>/<attempt>. Defaults to the
+      current run, so a later job in the same run needs no value here.
+    required: false
+outputs:
+  download-path:
+    description: Absolute path the artifact was written to.
+runs:
+  using: node20
+  main: dist/index.js

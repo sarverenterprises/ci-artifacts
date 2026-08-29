@@ -1,0 +1,19 @@
+{
+  "name": "ci-artifacts",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Upload and download GitHub Actions artifacts using Cloudflare R2 instead of GitHub artifact storage.",
+  "scripts": {
+    "build": "ncc build src/upload.js -o upload/dist --minify && ncc build src/download.js -o download/dist --minify",
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "@actions/core": "1.11.1",
+    "@actions/glob": "0.5.0",
+    "@aws-sdk/client-s3": "3.990.0",
+    "@aws-sdk/s3-request-presigner": "3.990.0"
+  },
+  "devDependencies": {
+    "@vercel/ncc": "0.38.3"
+  }
+}

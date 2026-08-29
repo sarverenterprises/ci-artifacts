@@ -1,0 +1,115 @@
+const fs = require("node:fs");
+const path = require("node:path");
+const { execFileSync } = require("node:child_process");
+const os = require("node:os");
+
+const core = require("@actions/core");
+const glob = require("@actions/glob");
+const { PutObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
+const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
+
+const { r2Config, runPrefix, assertSafeName } = require("./r2");
+
+// SigV4 caps presigned URL lifetime at seven days. Longer-lived artifacts are
+// still in the bucket; they just need a freshly signed link.
+const MAX_PRESIGN_SECONDS = 604800;
+
+async function resolveFiles(pattern) {
+  const globber = await glob.create(pattern, { matchDirectories: false });
+
+  return globber.glob();
+}
+
+/**
+ * Deepest directory containing every matched file.
+ *
+ * A multi-line pattern produces several search paths, so taking the first one
+ * would put "../" segments into the archive. The common ancestor keeps every
+ * stored path relative and inside the archive.
+ */
+function commonRoot(files) {
+  const split = files.map((file) => path.dirname(path.resolve(file)).split(path.sep));
+  const shared = split.reduce((acc, parts) => {
+    const limit = Math.min(acc.length, parts.length);
+    let i = 0;
+
+    while (i < limit && acc[i] === parts[i]) {
+      i += 1;
+    }
+
+    return acc.slice(0, i);
+  });
+
+  return shared.join(path.sep) || path.sep;
+}
+
+/**
+ * A single file is uploaded as-is so its link downloads the real artifact --
+ * an APK stays an APK. Multiple files are tarred so one artifact is one object.
+ */
+function buildPayload(files, root, name) {
+  if (files.length === 1 && fs.statSync(files[0]).isFile()) {
+    return { body: files[0], key: `${name}/${path.basename(files[0])}`, archived: false };
+  }
+
+  const archive = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "ci-artifact-")), `${name}.tar.gz`);
+  const relative = files.map((file) => path.relative(root, path.resolve(file)));
+
+  // tar ships on every supported runner, so this needs no bundled zip library.
+  execFileSync("tar", ["-czf", archive, "-C", root, "--", ...relative], { stdio: "inherit" });
+
+  return { body: archive, key: `${name}.tar.gz`, archived: true };
+}
+
+async function run() {
+  const name = assertSafeName(core.getInput("name", { required: true }));
+  const pattern = core.getInput("path", { required: true });
+  const ifNoFilesFound = core.getInput("if-no-files-found") || "warn";
+  const expiry = Math.min(Number(core.getInput("link-expiry-seconds") || 604800), MAX_PRESIGN_SECONDS);
+
+  const files = await resolveFiles(pattern);
+
+  if (files.length === 0) {
+    const message = `No files matched "${pattern}".`;
+
+    if (ifNoFilesFound === "error") {
+      throw new Error(message);
+    }
+    if (ifNoFilesFound === "warn") {
+      core.warning(message);
+    }
+    return;
+  }
+
+  const { bucket, client } = r2Config();
+  const { body, key, archived } = buildPayload(files, commonRoot(files), name);
+  const objectKey = `${runPrefix()}/${key}`;
+  const size = fs.statSync(body).size;
+
+  await client.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: objectKey,
+      Body: fs.createReadStream(body),
+      ContentLength: size,
+    }),
+  );
+
+  const url = await getSignedUrl(client, new GetObjectCommand({ Bucket: bucket, Key: objectKey }), {
+    expiresIn: expiry,
+  });
+
+  core.setOutput("object-key", objectKey);
+  core.setOutput("url", url);
+  core.setOutput("size", String(size));
+
+  const megabytes = (size / 1048576).toFixed(1);
+  const detail = archived ? `${files.length} files, tar.gz` : path.basename(files[0]);
+
+  core.info(`Uploaded ${objectKey} (${megabytes} MB)`);
+  await core.summary
+    .addRaw(`**Artifact \`${name}\`** — [download](${url}) · ${megabytes} MB · ${detail}\n\n`)
+    .write();
+}
+
+run().catch((error) => core.setFailed(error.message));

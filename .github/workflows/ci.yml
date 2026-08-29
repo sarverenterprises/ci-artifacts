@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: self-hosted-turbo
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm test
+
+      # The committed bundles are what Actions executes, so a stale dist would
+      # silently ship the previous version of the code.
+      - name: Verify committed bundles match src
+        run: |
+          npm run build
+          if ! git diff --quiet -- upload/dist download/dist; then
+            echo "::error::upload/dist or download/dist is stale. Run 'npm run build' and commit the result." >&2
+            git --no-pager diff --stat -- upload/dist download/dist
+            exit 1
+          fi

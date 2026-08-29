@@ -1,0 +1,29 @@
+name: Upload artifact to R2
+description: >-
+  Upload a build artifact to the shared Cloudflare R2 bucket instead of GitHub
+  artifact storage, and add a presigned download link to the job summary.
+inputs:
+  name:
+    description: Artifact name. 1-128 letters, numbers, dots, underscores, or hyphens.
+    required: true
+  path:
+    description: File, directory, or glob to upload.
+    required: true
+  if-no-files-found:
+    description: Behaviour when the path matches nothing. One of warn, error, ignore.
+    required: false
+    default: warn
+  link-expiry-seconds:
+    description: Presigned link lifetime. Capped at 604800 (7 days) by SigV4.
+    required: false
+    default: "604800"
+outputs:
+  object-key:
+    description: Key of the uploaded object in the bucket.
+  url:
+    description: Presigned download URL.
+  size:
+    description: Uploaded size in bytes.
+runs:
+  using: node20
+  main: dist/index.js
