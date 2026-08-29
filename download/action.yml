@@ -16,5 +16,5 @@ outputs:
   download-path:
     description: Absolute path the artifact was written to.
 runs:
-  using: node20
+  using: node24
   main: dist/index.js

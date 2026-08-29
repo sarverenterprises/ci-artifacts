@@ -25,5 +25,5 @@ outputs:
   size:
     description: Uploaded size in bytes.
 runs:
-  using: node20
+  using: node24
   main: dist/index.js
