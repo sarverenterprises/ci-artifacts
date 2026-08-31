@@ -7,6 +7,7 @@ const { spawn } = require("node:child_process");
 const test = require("node:test");
 
 const { encodeUploadToken } = require("../src/presigned");
+const { extractTarGzSafely } = require("../src/archive");
 
 test("upload action sends a directory through a scoped URL without R2 credentials", async (t) => {
   let uploaded = Buffer.alloc(0);
@@ -66,4 +67,11 @@ test("upload action sends a directory through a scoped URL without R2 credential
   assert.equal(uploaded[0], 0x1f);
   assert.equal(uploaded[1], 0x8b);
   assert.match(fs.readFileSync(output, "utf8"), new RegExp(`object-key<<[^\n]+\n${objectKey}`));
+
+  const received = path.join(work, "received.tar.gz");
+  const extracted = path.join(work, "received");
+  fs.writeFileSync(received, uploaded);
+  await extractTarGzSafely(received, extracted, { replaceExisting: true });
+  assert.equal(fs.readFileSync(path.join(extracted, "index.html"), "utf8"), "<h1>Journal</h1>");
+  assert.equal(fs.readFileSync(path.join(extracted, "assets/app.css"), "utf8"), "body{}\n");
 });
