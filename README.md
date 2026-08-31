@@ -46,6 +46,44 @@ R2 has no such quota. Retention is enforced by bucket lifecycle rules.
 
 Outputs: `object-key`, `url`, `size`.
 
+### Secret-free candidate uploads
+
+Do not give R2 credentials to a job that executes pull-request or candidate
+code. Use a trusted authorization job to create a short-lived capability for
+one exact tar.gz object, then pass its outputs to the candidate job:
+
+```yaml
+jobs:
+  authorize:
+    environment: staging
+    outputs:
+      upload-token: ${{ steps.r2.outputs.upload-token }}
+      object-key: ${{ steps.r2.outputs.object-key }}
+    steps:
+      - id: r2
+        uses: sarverenterprises/ci-artifacts/presign-upload@v1
+        with:
+          name: candidate-build
+        env:
+          R2_CI_ACCESS_KEY_ID: ${{ secrets.R2_CI_ACCESS_KEY_ID }}
+          R2_CI_SECRET_ACCESS_KEY: ${{ secrets.R2_CI_SECRET_ACCESS_KEY }}
+          R2_CI_ENDPOINT: ${{ vars.R2_CI_ENDPOINT }}
+          R2_CI_BUCKET: ${{ vars.R2_CI_BUCKET }}
+
+  candidate:
+    needs: authorize
+    steps:
+      - uses: sarverenterprises/ci-artifacts/upload@v1
+        with:
+          name: candidate-build
+          path: dist
+          presigned-upload-token: ${{ needs.authorize.outputs.upload-token }}
+          expected-object-key: ${{ needs.authorize.outputs.object-key }}
+```
+
+The candidate receives a capability that expires in 15 minutes by default and
+can write only the named object. It never receives the R2 access key or secret.
+
 ### Inputs — `download`
 
 | Input | Required | Default | Meaning |
@@ -105,5 +143,5 @@ npm run build               # rebuild upload/dist and download/dist
 node tests/e2e-roundtrip.js # requires a local S3 server on :9111
 ```
 
-`upload/dist` and `download/dist` are committed build outputs. CI fails if they
-drift from `src/`.
+`upload/dist`, `download/dist`, and `presign-upload/dist` are committed build
+outputs. CI fails if they drift from `src/`.

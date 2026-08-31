@@ -1,0 +1,25 @@
+name: Authorize one R2 artifact upload
+description: >-
+  Create a short-lived presigned PUT capability for one tar.gz artifact. Run
+  this action in a trusted job, then pass its outputs to a secret-free job.
+inputs:
+  name:
+    description: Artifact name. 1-128 letters, numbers, dots, underscores, or hyphens.
+    required: true
+  expiry-seconds:
+    description: Upload capability lifetime from 60 through 3600 seconds.
+    required: false
+    default: "900"
+  key-prefix:
+    description: >-
+      Replace the repository segment of the object key. Same character rules
+      as name. Defaults to the repository name.
+    required: false
+outputs:
+  upload-token:
+    description: Base64url-encoded, short-lived presigned PUT URL.
+  object-key:
+    description: Exact R2 object key authorized by the upload token.
+runs:
+  using: node24
+  main: dist/index.js

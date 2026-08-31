@@ -23,6 +23,14 @@ inputs:
     description: Presigned link lifetime. Capped at 604800 (7 days) by SigV4.
     required: false
     default: "604800"
+  presigned-upload-token:
+    description: >-
+      Base64url token from presign-upload. When set with expected-object-key,
+      this action uploads without R2 credentials.
+    required: false
+  expected-object-key:
+    description: Exact object key from presign-upload. Required with presigned-upload-token.
+    required: false
 outputs:
   object-key:
     description: Key of the uploaded object in the bucket.
