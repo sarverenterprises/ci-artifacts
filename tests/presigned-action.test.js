@@ -71,7 +71,7 @@ test("upload action sends a directory through a scoped URL without R2 credential
   const received = path.join(work, "received.tar.gz");
   const extracted = path.join(work, "received");
   fs.writeFileSync(received, uploaded);
-  await extractTarGzSafely(received, extracted, { replaceExisting: true });
+  await extractTarGzSafely(received, extracted, { allowedRoot: work, replaceExisting: true });
   assert.equal(fs.readFileSync(path.join(extracted, "index.html"), "utf8"), "<h1>Journal</h1>");
   assert.equal(fs.readFileSync(path.join(extracted, "assets/app.css"), "utf8"), "body{}\n");
 });

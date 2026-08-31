@@ -48,7 +48,10 @@ test("safe extraction atomically replaces a stale destination", async () => {
   await fsp.mkdir(destination);
   await fsp.writeFile(path.join(destination, "stale.txt"), "stale");
 
-  const result = await extractTarGzSafely(archive, destination, { replaceExisting: true });
+  const result = await extractTarGzSafely(archive, destination, {
+    allowedRoot: directory,
+    replaceExisting: true,
+  });
 
   assert.deepEqual(result, { expandedBytes: 33, members: 3 });
   assert.equal(await fsp.readFile(path.join(destination, "index.html"), "utf8"), "<h1>Journal</h1>");
@@ -66,7 +69,10 @@ test("safe extraction rejects traversal and link members before destination writ
   ]) {
     const { archive, directory } = await archiveWith([entry]);
     const destination = path.join(directory, "dist");
-    await assert.rejects(extractTarGzSafely(archive, destination, { replaceExisting: true }), /Unsafe archive|prohibited type/);
+    await assert.rejects(extractTarGzSafely(archive, destination, {
+      allowedRoot: directory,
+      replaceExisting: true,
+    }), /Unsafe archive|prohibited type/);
     assert.equal(await fsp.readdir(directory).then((items) => items.includes("dist")), false);
     assert.equal(await fsp.readdir(path.dirname(directory)).then((items) => items.includes("escape.txt")), false);
   }
@@ -111,9 +117,31 @@ test("safe extraction enforces compressed, expanded, member, and per-file limits
 });
 
 test("safe replacement refuses broad destinations", async () => {
-  const { archive } = await archiveWith([{ name: "index.html", body: "ok" }]);
+  const { archive, directory } = await archiveWith([{ name: "index.html", body: "ok" }]);
   await assert.rejects(
-    extractTarGzSafely(archive, process.cwd(), { replaceExisting: true }),
-    /Refusing to replace broad artifact destination/,
+    extractTarGzSafely(archive, directory, { allowedRoot: directory, replaceExisting: true }),
+    /must be below/,
+  );
+  await assert.rejects(
+    extractTarGzSafely(archive, `${directory}/child/..`, { allowedRoot: directory, replaceExisting: true }),
+    /containing '\.\.'/,
+  );
+  await assert.rejects(
+    extractTarGzSafely(archive, path.dirname(directory), { allowedRoot: directory, replaceExisting: true }),
+    /must be below/,
+  );
+});
+
+test("safe replacement rejects a symlinked parent that escapes its allowed root", async () => {
+  const { archive, directory } = await archiveWith([{ name: "index.html", body: "ok" }]);
+  const outside = await fsp.mkdtemp(path.join(os.tmpdir(), "ci-archive-outside-"));
+  await fsp.symlink(outside, path.join(directory, "escape"));
+
+  await assert.rejects(
+    extractTarGzSafely(archive, path.join(directory, "escape", "dist"), {
+      allowedRoot: directory,
+      replaceExisting: true,
+    }),
+    /escaped allowed root/,
   );
 });

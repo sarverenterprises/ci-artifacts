@@ -94,16 +94,34 @@ async function mergeTree(source, destination) {
   }
 }
 
-function assertReplaceTarget(destination) {
-  const root = path.parse(destination).root;
-  const blocked = new Set([root, path.resolve(process.cwd()), path.resolve(os.homedir())]);
-  if (blocked.has(destination)) {
-    throw new Error(`Refusing to replace broad artifact destination ${destination}.`);
+function isStrictDescendant(root, target) {
+  return target.startsWith(`${root}${path.sep}`);
+}
+
+async function replacementTarget(destination, allowedRoot) {
+  if (!allowedRoot) throw new Error("Atomic artifact replacement requires an explicit allowed root.");
+  if (String(destination).split(/[\\/]+/).includes("..")) {
+    throw new Error("Atomic artifact replacement rejects destinations containing '..'.");
   }
+
+  const requestedRoot = path.resolve(allowedRoot);
+  const requestedDestination = path.resolve(destination);
+  if (!isStrictDescendant(requestedRoot, requestedDestination)) {
+    throw new Error(`Artifact replacement destination must be below ${requestedRoot}.`);
+  }
+
+  const realRoot = await fsp.realpath(requestedRoot);
+  const parent = path.dirname(requestedDestination);
+  await fsp.mkdir(parent, { recursive: true });
+  const realParent = await fsp.realpath(parent);
+  const resolvedDestination = path.join(realParent, path.basename(requestedDestination));
+  if (!isStrictDescendant(realRoot, resolvedDestination)) {
+    throw new Error(`Artifact replacement destination escaped allowed root ${realRoot}.`);
+  }
+  return resolvedDestination;
 }
 
 async function replaceTree(source, destination) {
-  assertReplaceTarget(destination);
   const existing = await pathState(destination);
   if (existing?.isSymbolicLink()) throw new Error("Artifact destination cannot be a symbolic link.");
   if (existing && !existing.isDirectory()) throw new Error("Artifact destination must be a directory.");
@@ -133,10 +151,14 @@ async function extractTarGzSafely(archive, destination, options = {}) {
   if (archiveSize > limits.maxCompressedBytes) throw new Error("Archive exceeds the compressed-size limit.");
 
   const requestedDestination = path.resolve(destination);
+  let validatedReplacement = null;
+  if (options.replaceExisting) {
+    validatedReplacement = await replacementTarget(destination, options.allowedRoot);
+  }
   const destinationParent = path.dirname(requestedDestination);
   await fsp.mkdir(destinationParent, { recursive: true });
   const realParent = await fsp.realpath(destinationParent);
-  const resolvedDestination = path.join(realParent, path.basename(requestedDestination));
+  const resolvedDestination = validatedReplacement ?? path.join(realParent, path.basename(requestedDestination));
   let staging = await fsp.mkdtemp(path.join(realParent, `.${path.basename(requestedDestination)}.extract-`));
   const state = { expandedBytes: 0, members: 0, names: new Set() };
   const extract = tar.extract();

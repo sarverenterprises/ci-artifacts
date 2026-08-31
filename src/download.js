@@ -48,7 +48,10 @@ async function run() {
       await pipeline(response.Body, fs.createWriteStream(target, { flags: "wx" }));
 
       if (isArchive) {
-        const extracted = await extractTarGzSafely(target, destination, { replaceExisting });
+        const extracted = await extractTarGzSafely(target, destination, {
+          allowedRoot: process.env.GITHUB_WORKSPACE,
+          replaceExisting,
+        });
         core.info(`Validated ${extracted.members} archive members (${extracted.expandedBytes} expanded bytes).`);
       }
     } finally {

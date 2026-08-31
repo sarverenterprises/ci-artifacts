@@ -102,6 +102,9 @@ rejects absolute or traversal paths, links, devices, FIFOs, duplicate members,
 more than 10,000 members, compressed archives over 256 MB, decompressed tar
 streams over 544 MB, expanded file content over 512 MB, and single files over
 128 MB before they can reach the destination.
+Atomic replacement also requires the destination to be a strict real-path
+descendant of `GITHUB_WORKSPACE`; the workspace, its ancestors, `..` paths, and
+symlink escapes are rejected.
 
 ## Configuration
 
