@@ -4,7 +4,7 @@
   "private": true,
   "description": "Upload and download GitHub Actions artifacts using Cloudflare R2 instead of GitHub artifact storage.",
   "scripts": {
-    "build": "ncc build src/upload.js -o upload/dist --minify && ncc build src/download.js -o download/dist --minify",
+    "build": "ncc build src/upload.js -o upload/dist --minify && ncc build src/download.js -o download/dist --minify && ncc build src/presign-upload.js -o presign-upload/dist --minify",
     "test": "node --test tests/*.test.js"
   },
   "dependencies": {

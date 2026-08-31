@@ -8,6 +8,7 @@ const glob = require("@actions/glob");
 const { PutObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 
+const { decodeUploadToken, putPresignedFile } = require("./presigned");
 const { r2Config, runPrefix, assertSafeName } = require("./r2");
 
 // SigV4 caps presigned URL lifetime at seven days. Longer-lived artifacts are
@@ -93,6 +94,12 @@ async function run() {
   // Validated like an artifact name because it reaches an object key too.
   const keyPrefixInput = core.getInput("key-prefix");
   const keyPrefix = keyPrefixInput ? assertSafeName(keyPrefixInput.trim()) : "";
+  const presignedUploadToken = core.getInput("presigned-upload-token");
+  const expectedObjectKey = core.getInput("expected-object-key");
+
+  if (Boolean(presignedUploadToken) !== Boolean(expectedObjectKey)) {
+    throw new Error("presigned-upload-token and expected-object-key must be supplied together.");
+  }
 
   const files = await resolveFiles(pattern);
 
@@ -108,11 +115,27 @@ async function run() {
     return;
   }
 
-  const { bucket, client } = r2Config();
   const { root, declaredDirectory } = resolveRoot(pattern, files);
   const { body, key, archived } = buildPayload(files, root, name, declaredDirectory);
   const objectKey = `${runPrefix(process.env, keyPrefix)}/${key}`;
   const size = fs.statSync(body).size;
+
+  if (presignedUploadToken) {
+    if (objectKey !== expectedObjectKey) {
+      throw new Error(
+        `Prepared artifact key ${objectKey} does not match authorized key ${expectedObjectKey}. ` +
+          "Presigned uploads require a directory or multi-file path that produces a tar.gz artifact.",
+      );
+    }
+
+    await putPresignedFile(decodeUploadToken(presignedUploadToken), body, size);
+    core.setOutput("object-key", objectKey);
+    core.setOutput("size", String(size));
+    core.info(`Uploaded ${objectKey} with a short-lived, one-object capability.`);
+    return;
+  }
+
+  const { bucket, client } = r2Config();
 
   await client.send(
     new PutObjectCommand({
