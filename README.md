@@ -93,8 +93,18 @@ as required by SigV4.
 | `name` | yes | — | Artifact to fetch |
 | `path` | no | the artifact name | Destination directory |
 | `run-prefix` | no | the current run | `<repo>/<run_id>/<attempt>` to read from an earlier run |
+| `replace-existing` | no | `false` | Atomically replace a narrow destination after safe archive extraction |
 
 Output: `download-path`.
+
+Archived downloads are extracted in a fresh sibling directory. The action
+rejects absolute or traversal paths, links, devices, FIFOs, duplicate members,
+more than 10,000 members, compressed archives over 256 MB, decompressed tar
+streams over 544 MB, expanded file content over 512 MB, and single files over
+128 MB before they can reach the destination.
+Atomic replacement also requires the destination to be a strict real-path
+descendant of `GITHUB_WORKSPACE`; the workspace, its ancestors, `..` paths, and
+symlink escapes are rejected.
 
 ## Configuration
 

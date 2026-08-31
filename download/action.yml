@@ -12,6 +12,12 @@ inputs:
       Override the source prefix, as <repo>/<run_id>/<attempt>. Defaults to the
       current run, so a later job in the same run needs no value here.
     required: false
+  replace-existing:
+    description: >-
+      Replace the destination directory atomically after validated archive
+      extraction. Refuses broad targets such as the workspace or home directory.
+    required: false
+    default: "false"
 outputs:
   download-path:
     description: Absolute path the artifact was written to.
