@@ -112,7 +112,11 @@ async function replacementTarget(destination, allowedRoot) {
 
   const realRoot = await fsp.realpath(requestedRoot);
   const parent = path.dirname(requestedDestination);
-  await fsp.mkdir(parent, { recursive: true });
+  const parentState = await pathState(parent);
+  if (!parentState) throw new Error("Atomic artifact replacement requires an existing destination parent.");
+  if (parentState.isSymbolicLink() || !parentState.isDirectory()) {
+    throw new Error("Atomic artifact replacement requires a real destination-parent directory.");
+  }
   const realParent = await fsp.realpath(parent);
   const resolvedDestination = path.join(realParent, path.basename(requestedDestination));
   if (!isStrictDescendant(realRoot, resolvedDestination)) {
@@ -156,7 +160,7 @@ async function extractTarGzSafely(archive, destination, options = {}) {
     validatedReplacement = await replacementTarget(destination, options.allowedRoot);
   }
   const destinationParent = path.dirname(requestedDestination);
-  await fsp.mkdir(destinationParent, { recursive: true });
+  if (!options.replaceExisting) await fsp.mkdir(destinationParent, { recursive: true });
   const realParent = await fsp.realpath(destinationParent);
   const resolvedDestination = validatedReplacement ?? path.join(realParent, path.basename(requestedDestination));
   let staging = await fsp.mkdtemp(path.join(realParent, `.${path.basename(requestedDestination)}.extract-`));

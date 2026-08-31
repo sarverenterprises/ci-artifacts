@@ -142,6 +142,16 @@ test("safe replacement rejects a symlinked parent that escapes its allowed root"
       allowedRoot: directory,
       replaceExisting: true,
     }),
-    /escaped allowed root/,
+    /real destination-parent directory/,
   );
+
+  const missingChild = path.join(outside, "new");
+  await assert.rejects(
+    extractTarGzSafely(archive, path.join(directory, "escape", "new", "dist"), {
+      allowedRoot: directory,
+      replaceExisting: true,
+    }),
+    /existing destination parent/,
+  );
+  await assert.rejects(fsp.access(missingChild));
 });
