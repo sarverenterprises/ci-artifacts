@@ -82,7 +82,9 @@ jobs:
 ```
 
 The candidate receives a capability that expires in 15 minutes by default and
-can write only the named object. It never receives the R2 access key or secret.
+can write only the named object. It never receives reusable R2 credentials or
+the R2 secret access key. The signed URL includes the non-secret access-key ID
+as required by SigV4.
 
 ### Inputs — `download`
 
