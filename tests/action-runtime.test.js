@@ -18,7 +18,8 @@ function directRunsUsing(content) {
     const line = lines[i];
     const trimmed = line.trim();
 
-    if (trimmed === 'runs:') {
+    // Change condition to only match root-level runs:
+    if (trimmed === 'runs:' && line.search(/\S/) === 0) {
       runsLineIndex = i;
       runsIndent = line.search(/\S/);
       break;
@@ -97,4 +98,17 @@ test('nested deeper using node24 is not a direct runs child', () => {
     using: node24
 `;
   assert.equal(directRunsUsing(content), null);
+});
+
+// Regression test: nested inputs.runs before root runs
+// Should still find root runs.using node24
+
+test('nested inputs.runs before root runs', () => {
+  const content = `inputs:
+  runs:
+    using: node20
+runs:
+  using: node24
+`;
+  assert.equal(directRunsUsing(content), 'node24');
 });
